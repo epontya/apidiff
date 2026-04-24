@@ -1,22 +1,21 @@
-"""Formats and outputs a DiffReport in various formats."""
+"""Output formatting and writing for DiffReport results."""
 
 import json
-from typing import TextIO
-
-from apidiff.differ import DiffReport
+import sys
+from typing import Optional
+from apidiff.differ import DiffReport, Change
+from apidiff.summary import summarize, format_summary
 
 
 def report_to_dict(report: DiffReport) -> dict:
     """Serialize a DiffReport to a plain dictionary."""
     return {
-        "summary": report.summary(),
+        "summary": summarize(report).as_dict(),
         "changes": [
             {
                 "path": c.path,
                 "change_type": c.change_type.value,
                 "severity": c.severity.value,
-                "old_value": c.old_value,
-                "new_value": c.new_value,
                 "description": c.description,
             }
             for c in report.changes
@@ -26,66 +25,42 @@ def report_to_dict(report: DiffReport) -> dict:
 
 def report_to_json(report: DiffReport, indent: int = 2) -> str:
     """Serialize a DiffReport to a JSON string."""
-    return json.dumps(report_to_dict(report), indent=indent, default=str)
+    return json.dumps(report_to_dict(report), indent=indent)
 
 
 def report_to_text(report: DiffReport) -> str:
-    """Format a DiffReport as a human-readable text summary."""
+    """Format a DiffReport as human-readable text."""
     lines = []
-    summary = report.summary()
-    lines.append("=" * 50)
-    lines.append("API Diff Report")
-    lines.append("=" * 50)
-    lines.append(
-        f"Total changes : {summary['total']}"
-    )
-    lines.append(
-        f"Breaking      : {summary['breaking']}"
-    )
-    lines.append(
-        f"Non-breaking  : {summary['non_breaking']}"
-    )
-    lines.append(
-        f"Info          : {summary['info']}"
-    )
-    lines.append("")
+    summary = summarize(report)
+    lines.append(format_summary(summary))
 
-    if not report.changes:
-        lines.append("No changes detected.")
-        return "\n".join(lines)
-
-    severity_order = {"breaking": 0, "non-breaking": 1, "info": 2}
-    sorted_changes = sorted(
-        report.changes, key=lambda c: severity_order.get(c.severity.value, 99)
-    )
-
-    for change in sorted_changes:
-        severity_label = change.severity.value.upper()
-        lines.append(
-            f"[{severity_label}] ({change.change_type.value}) {change.description}"
-        )
-        lines.append(f"  path: {change.path}")
-        if change.old_value is not None:
-            lines.append(f"  old : {change.old_value}")
-        if change.new_value is not None:
-            lines.append(f"  new : {change.new_value}")
-        lines.append("")
+    if report.changes:
+        lines.append("\nChanges:")
+        for change in report.changes:
+            severity_tag = "[BREAKING]" if change.severity.value == "breaking" else "[non-breaking]"
+            lines.append(f"  {severity_tag} {change.change_type.value.upper()} {change.path}")
+            lines.append(f"    {change.description}")
+    else:
+        lines.append("\nNo changes detected.")
 
     return "\n".join(lines)
 
 
 def write_report(
-    report: DiffReport, fmt: str = "text", stream: TextIO | None = None
-) -> str:
-    """Write a formatted report to a stream (or return as string)."""
+    report: DiffReport,
+    fmt: str = "text",
+    output_path: Optional[str] = None,
+) -> None:
+    """Write a formatted report to a file or stdout."""
     if fmt == "json":
-        output = report_to_json(report)
-    elif fmt == "text":
-        output = report_to_text(report)
+        content = report_to_json(report)
     else:
-        raise ValueError(f"Unsupported format: '{fmt}'. Choose 'text' or 'json'.")
+        content = report_to_text(report)
 
-    if stream is not None:
-        stream.write(output)
-
-    return output
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as fh:
+            fh.write(content)
+            fh.write("\n")
+    else:
+        sys.stdout.write(content)
+        sys.stdout.write("\n")
