@@ -22,6 +22,18 @@ class AnnotatedReport:
     def is_empty(self) -> bool:
         return len(self.annotated) == 0
 
+    def filter_by_effort(self, effort: str) -> List[AnnotatedChange]:
+        """Return only annotated changes matching the given migration effort level.
+
+        Args:
+            effort: One of ``"low"``, ``"medium"``, or ``"high"``.
+
+        Returns:
+            A list of :class:`AnnotatedChange` instances whose
+            ``migration_effort`` equals *effort*.
+        """
+        return [ac for ac in self.annotated if ac.migration_effort == effort]
+
 
 _HINTS = {
     ChangeType.REMOVED_PATH: (
