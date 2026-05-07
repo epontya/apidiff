@@ -47,8 +47,8 @@ def _make_args(old, new, breaking_only=False, fail_on_breaking=False, fmt="text"
     parser = build_webhooks_parser()
     return parser.parse_args([
         str(old), str(new),
-        *([ "--breaking-only"] if breaking_only else []),
-        *([ "--fail-on-breaking"] if fail_on_breaking else []),
+        *(["--breaking-only"] if breaking_only else []),
+        *(["--fail-on-breaking"] if fail_on_breaking else []),
         "--format", fmt,
     ])
 
@@ -79,3 +79,13 @@ def test_breaking_only_flag_filters_output(base_file, safe_file, capsys):
     run_webhooks(args)
     captured = capsys.readouterr()
     assert "orderUpdated" not in captured.out or "BREAKING" not in captured.out
+
+
+def test_json_format_output_is_valid_json(base_file, breaking_file, capsys):
+    """Ensure --format json produces parseable JSON output."""
+    args = _make_args(base_file, breaking_file, fmt="json")
+    run_webhooks(args)
+    captured = capsys.readouterr()
+    # Output must be valid JSON when the json format is requested
+    parsed = json.loads(captured.out)
+    assert isinstance(parsed, (dict, list))
